@@ -1,0 +1,35 @@
+name: NABEEL integration CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - "pr/nabeel-*"
+
+permissions:
+  contents: read
+
+jobs:
+  nabeel-integration:
+    name: nabeel-integration
+    runs-on: [self-hosted, Linux, X64, codestra-ci, nabeel-ci]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain)"
+          python3 -m py_compile docs/scripts/nabeel-obs-bootstrap.py docs/scripts/nabeel-staging-certify.py
+          bash -n docs/scripts/nabeel-postprocess.sh
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          OBS_CONFIG_ROOT="$tmp/config" NABEEL_MEDIA_ROOT="$tmp/media" python3 docs/scripts/nabeel-obs-bootstrap.py
+          test -s "$tmp/config/basic/profiles/NABEEL-1080p60/basic.ini"
+          test -s "$tmp/config/basic/scenes/NABEEL-Station.json"
